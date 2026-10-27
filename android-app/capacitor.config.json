@@ -1,0 +1,26 @@
+{
+  "appId": "ro.bucur.myiptv",
+  "appName": "My IPTV",
+  "webDir": "www",
+  "android": {
+    "allowMixedContent": true,
+    "webContentsDebuggingEnabled": true,
+    "backgroundColor": "#0c0e13"
+  },
+  "plugins": {
+    "CapacitorHttp": {
+      "enabled": false
+    },
+    "StatusBar": {
+      "style": "DARK",
+      "backgroundColor": "#14171f",
+      "overlaysWebView": false
+    },
+    "SplashScreen": {
+      "launchShowDuration": 500,
+      "backgroundColor": "#0c0e13",
+      "showSpinner": false,
+      "androidSplashResourceName": "splash"
+    }
+  }
+}

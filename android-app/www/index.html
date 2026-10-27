@@ -1,0 +1,853 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>My IPTV</title>
+<meta name="theme-color" content="#14171f">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/favicon-64.png" sizes="64x64">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<script>window.libErr = [];</script>
+<!-- Bundled locally by tools/vendor.mjs so the app works offline and on first launch. -->
+<script src="vendor/hls.min.js"  onerror="libErr.push('hls.js')"></script>
+<script src="vendor/mpegts.js"   onerror="libErr.push('mpegts.js')"></script>
+<style>
+  :root{
+    --bg:#0c0e13; --panel:#14171f; --panel-2:#1b1f29; --line:#252b38;
+    --text:#e7eaf0; --dim:#8b94a7; --accent:#ff5a3c; --ok:#3ddc97;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0; background:var(--bg); color:var(--text);
+    font:15px/1.45 "Segoe UI",system-ui,-apple-system,sans-serif;
+    display:flex; flex-direction:column; overflow:hidden;
+  }
+  button,input,select{font:inherit}
+
+  /* ---------- top bar ---------- */
+  header{
+    display:flex; align-items:center; gap:12px; padding:10px 14px;
+    background:var(--panel); border-bottom:1px solid var(--line); flex:0 0 auto;
+  }
+  .logo{font-weight:700; letter-spacing:.5px; color:var(--accent); white-space:nowrap}
+  .logo span{color:var(--text)}
+  header input[type=search]{
+    flex:1; min-width:0; background:var(--panel-2); color:var(--text);
+    border:1px solid var(--line); border-radius:8px; padding:8px 12px;
+  }
+  .btn{
+    background:var(--panel-2); color:var(--text); border:1px solid var(--line);
+    border-radius:8px; padding:8px 12px; cursor:pointer; white-space:nowrap;
+  }
+  .btn:hover{border-color:var(--accent)}
+  .btn.primary{background:var(--accent); border-color:var(--accent); color:#fff; font-weight:600}
+
+  /* ---------- layout ---------- */
+  main{flex:1; display:flex; min-height:0}
+  aside{
+    width:230px; flex:0 0 auto; background:var(--panel); border-right:1px solid var(--line);
+    overflow-y:auto; padding:8px;
+  }
+  .grp{
+    padding:8px 10px; border-radius:7px; cursor:pointer; color:var(--dim);
+    display:flex; justify-content:space-between; gap:8px; font-size:14px;
+  }
+  .grp:hover{background:var(--panel-2); color:var(--text)}
+  .grp.on{background:var(--accent); color:#fff; font-weight:600}
+  .grp b{font-weight:400; opacity:.7; font-size:12px}
+
+  .content{flex:1; display:flex; flex-direction:column; min-width:0}
+  .stage{background:#000; position:relative; flex:0 0 auto; display:none}
+  .stage.live{display:block}
+  video{width:100%; aspect-ratio:16/9; max-height:52vh; display:block; background:#000}
+  .nowplaying{
+    position:absolute; left:0; right:0; bottom:0; padding:10px 14px;
+    background:linear-gradient(transparent,rgba(0,0,0,.85)); font-size:14px;
+    display:flex; align-items:center; gap:10px; pointer-events:none;
+  }
+  .nowplaying .st{font-size:12px; color:var(--dim)}
+
+  .list{flex:1; overflow-y:auto; padding:8px}
+  .ch{
+    display:flex; align-items:center; gap:12px; padding:8px 10px;
+    border-radius:8px; cursor:pointer; border:1px solid transparent;
+  }
+  .ch:hover{background:var(--panel)}
+  .ch.on{background:var(--panel-2); border-color:var(--accent)}
+  .ic{
+    position:relative; width:44px; height:30px; flex:0 0 auto; overflow:hidden;
+    background:var(--panel-2); border-radius:4px; display:grid; place-items:center;
+  }
+  .ic b{font-size:13px; font-weight:700; color:var(--dim)}
+  .ic img{position:absolute; inset:0; width:100%; height:100%; object-fit:contain}
+  .ch .nm{flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+  .ch .fav{opacity:.25; font-size:17px; padding:0 4px}
+  .ch .fav.on{opacity:1; color:var(--accent)}
+  .empty{color:var(--dim); text-align:center; padding:48px 16px}
+
+  /* ---------- modal ---------- */
+  .veil{
+    position:fixed; inset:0; background:rgba(0,0,0,.72); display:none;
+    align-items:center; justify-content:center; padding:16px; z-index:20;
+  }
+  .veil.show{display:flex}
+  .modal{
+    background:var(--panel); border:1px solid var(--line); border-radius:14px;
+    width:100%; max-width:430px; padding:20px; max-height:90vh; overflow-y:auto;
+  }
+  .modal h2{margin:0 0 4px; font-size:18px}
+  .modal p.hint{margin:0 0 16px; color:var(--dim); font-size:13px}
+  .tabs{display:flex; gap:6px; margin-bottom:16px}
+  .tabs button{flex:1; padding:8px; background:var(--panel-2); border:1px solid var(--line);
+    color:var(--dim); border-radius:8px; cursor:pointer}
+  .tabs button.on{background:var(--accent); border-color:var(--accent); color:#fff}
+  .pane{display:none} .pane.on{display:block}
+  label{display:block; font-size:12px; color:var(--dim); margin:10px 0 4px}
+  .modal input{
+    width:100%; background:var(--panel-2); color:var(--text);
+    border:1px solid var(--line); border-radius:8px; padding:9px 11px;
+  }
+  .modal .btn.primary{width:100%; margin-top:18px; padding:11px}
+  .chips{display:flex; flex-wrap:wrap; gap:6px}
+  .chip{
+    display:inline-flex; align-items:center; gap:6px; margin:0;
+    background:var(--panel-2); border:1px solid var(--line); border-radius:999px;
+    padding:6px 11px; font-size:13px; color:var(--text); cursor:pointer;
+  }
+  .chip:has(input:checked){border-color:var(--accent)}
+  .chip input{accent-color:var(--accent)}
+  .msg{margin-top:12px; font-size:13px; min-height:18px}
+  .msg.err{color:var(--accent)} .msg.ok{color:var(--ok)}
+
+  /* ---------- native shell ---------- */
+  /* Phones have notches and gesture bars; without this the header hides
+     under the status bar and the last channel under the home pill. */
+  header{padding-top:calc(10px + env(safe-area-inset-top))}
+  header{padding-left:calc(14px + env(safe-area-inset-left))}
+  .list{padding-bottom:calc(8px + env(safe-area-inset-bottom))}
+  /* Kill the 300ms tap delay and the grey tap flash of the WebView. */
+  *{-webkit-tap-highlight-color:transparent; touch-action:manipulation}
+  /* Stop long-press turning channel names into a text selection. */
+  .ch,.grp,.btn,header{-webkit-user-select:none; user-select:none}
+  /* Fullscreen landscape playback */
+  body.cinema header,body.cinema aside,body.cinema .list{display:none}
+  body.cinema video{max-height:100vh; height:100vh}
+
+  /* ---------- diagnostics ---------- */
+  #toast{
+    position:fixed; left:50%; bottom:16px; transform:translateX(-50%);
+    max-width:min(620px,92vw); background:#2a1510; border:1px solid var(--accent);
+    color:var(--text); padding:11px 14px; border-radius:10px; font-size:13px;
+    z-index:30; display:none; box-shadow:0 10px 30px rgba(0,0,0,.6);
+  }
+  #toast.show{display:block}
+  #toast b{color:var(--accent)}
+  #toast .x{float:right; cursor:pointer; color:var(--dim); margin-left:10px}
+
+  @media(max-width:640px){
+    aside{position:absolute; z-index:10; height:calc(100% - 55px); transform:translateX(-100%);
+      transition:transform .2s}
+    aside.open{transform:none}
+    .logo span{display:none}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <button class="btn" id="burger" style="display:none">&#9776;</button>
+  <div class="logo">IPTV<span>&nbsp;Player</span></div>
+  <input type="search" id="q" placeholder="Search channels…" autocomplete="off">
+  <button class="btn" id="favBtn" title="Show favorites only">&#9733;</button>
+  <button class="btn" id="installBtn" title="Install to home screen" style="display:none">&#8623; Install</button>
+  <button class="btn" id="srcBtn">Source</button>
+</header>
+
+<main>
+  <aside id="groups"></aside>
+  <div class="content">
+    <div class="stage" id="stage">
+      <video id="video" controls playsinline></video>
+      <div class="nowplaying"><span id="npName"></span><span class="st" id="npState"></span></div>
+    </div>
+    <div class="list" id="list">
+      <div class="empty">No playlist loaded yet.<br>Hit <b>Source</b> to add an M3U URL, a file, or Xtream login.</div>
+    </div>
+  </div>
+</main>
+
+<div id="toast"><span class="x" onclick="this.parentNode.classList.remove('show')">&#10005;</span><span id="toastMsg"></span></div>
+
+<div class="veil" id="veil">
+  <div class="modal">
+    <h2>Add a source</h2>
+    <p class="hint">Your details stay in this browser's localStorage. Nothing is sent anywhere else.</p>
+    <div class="tabs">
+      <button data-pane="mix" class="on">Mix</button>
+      <button data-pane="m3u">M3U URL</button>
+      <button data-pane="file">File</button>
+      <button data-pane="xc">Xtream</button>
+    </div>
+
+    <div class="pane on" id="pane-mix">
+      <p class="hint" style="margin:0 0 12px">
+        Builds a playlist from the open <b>iptv-org</b> directory of publicly broadcast streams.
+        Runs in your browser, so it's always current.
+      </p>
+      <label>Countries</label>
+      <div class="chips" id="mixCountries">
+        <label class="chip"><input type="checkbox" value="ro" checked> Romania</label>
+        <label class="chip"><input type="checkbox" value="es" checked> Spain</label>
+        <label class="chip"><input type="checkbox" value="uk"> UK</label>
+        <label class="chip"><input type="checkbox" value="us"> USA</label>
+        <label class="chip"><input type="checkbox" value="it"> Italy</label>
+        <label class="chip"><input type="checkbox" value="fr"> France</label>
+      </div>
+      <label>Categories</label>
+      <div class="chips" id="mixCats">
+        <label class="chip"><input type="checkbox" value="sports" checked> Sports</label>
+        <label class="chip"><input type="checkbox" value="music" checked> Music</label>
+        <label class="chip"><input type="checkbox" value="movies" checked> Movies</label>
+        <label class="chip"><input type="checkbox" value="news"> News</label>
+        <label class="chip"><input type="checkbox" value="kids"> Kids</label>
+        <label class="chip"><input type="checkbox" value="documentary"> Docs</label>
+      </div>
+      <label class="chip" style="margin-top:12px; display:inline-flex">
+        <input type="checkbox" id="mixClean" checked> Skip geo-blocked &amp; part-time channels
+      </label>
+      <button class="btn primary" id="buildMix">Build playlist</button>
+      <button class="btn" id="saveMix" style="width:100%; margin-top:8px; display:none">⤓ Save as .m3u file</button>
+      <button class="btn" id="loadBundled" style="width:100%; margin-top:8px">Load bundled test playlist</button>
+    </div>
+
+    <div class="pane" id="pane-m3u">
+      <label>Playlist URL</label>
+      <input id="m3uUrl" placeholder="http://host:port/get.php?username=…&type=m3u_plus">
+      <button class="btn primary" id="loadM3u">Load playlist</button>
+    </div>
+
+    <div class="pane" id="pane-file">
+      <label>Local .m3u / .m3u8 file</label>
+      <input type="file" id="m3uFile" accept=".m3u,.m3u8,.txt">
+      <p class="hint" style="margin-top:14px">Best way to test without CORS problems.</p>
+    </div>
+
+    <div class="pane" id="pane-xc">
+      <label>Server (host:port)</label>
+      <input id="xcHost" placeholder="http://example.com:8080">
+      <label>Username</label><input id="xcUser" autocomplete="username">
+      <label>Password</label><input id="xcPass" type="password" autocomplete="current-password">
+      <button class="btn primary" id="loadXc">Connect</button>
+    </div>
+
+    <div class="msg" id="msg"></div>
+    <button class="btn" id="closeVeil" style="width:100%; margin-top:10px">Cancel</button>
+  </div>
+</div>
+
+<script>
+/* ============================================================
+   STATE
+   ============================================================ */
+const LS = {
+  src : 'iptv.source',
+  fav : 'iptv.favs',
+  last: 'iptv.lastChannel'
+};
+let channels = [];                                   // {name, url, logo, group, tvgId}
+let group    = 'All';
+let favOnly  = false;
+let query    = '';
+let current  = null;
+let favs     = new Set(JSON.parse(localStorage.getItem(LS.fav) || '[]'));
+let engine   = null;                                 // active hls.js / mpegts.js instance
+
+const $  = id => document.getElementById(id);
+
+/* ------------------------------------------------------------------
+   NATIVE HTTP
+   On Android the WebView origin is https://localhost, so fetching a
+   playlist from a provider is cross-origin and CORS applies exactly as
+   it did in the browser. CapacitorHttp runs the request natively in
+   Java, where CORS is not a concept, so providers that blocked the web
+   build just work. Falls back to fetch() so this same file still runs
+   in a desktop browser.
+   ------------------------------------------------------------------ */
+const native = () => window.Capacitor && window.Capacitor.isNativePlatform &&
+                     window.Capacitor.isNativePlatform() &&
+                     window.Capacitor.Plugins && window.Capacitor.Plugins.CapacitorHttp;
+
+async function httpGet(url, asJson){
+  if (native()){
+    const res = await Capacitor.Plugins.CapacitorHttp.get({
+      url,
+      responseType: asJson ? 'json' : 'text',
+      // Some providers reject the stock WebView agent outright.
+      headers: { 'User-Agent': 'VLC/3.0.20 LibVLC/3.0.20' },
+      connectTimeout: 15000,
+      readTimeout: 20000
+    });
+    if (res.status >= 400) throw new Error('HTTP ' + res.status);
+    if (asJson) return typeof res.data === 'string' ? JSON.parse(res.data) : res.data;
+    return typeof res.data === 'string' ? res.data : JSON.stringify(res.data);
+  }
+  const r = await fetch(url);
+  if (!r.ok) throw new Error('HTTP ' + r.status);
+  return asJson ? r.json() : r.text();
+}
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+/* ============================================================
+   M3U PARSER
+   Handles: #EXTINF:-1 tvg-id="x" tvg-logo="y" group-title="z",Channel Name
+   ============================================================ */
+function parseM3U(text){
+  const out = [];
+  const lines = text.split(/\r?\n/);
+  let pending = null;
+
+  for (const raw of lines){
+    const line = raw.trim();
+    if (!line) continue;
+
+    if (line.startsWith('#EXTINF')){
+      // Split at the first comma that is NOT inside a quoted attribute value.
+      // Splitting on the first comma breaks group-title="Sports, Live";
+      // splitting on the last one breaks a channel named "Sport, Live HD".
+      const [head, title] = (() => {
+        let quoted = false;
+        for (let i = 0; i < line.length; i++){
+          const c = line[i];
+          if (c === '"') quoted = !quoted;
+          else if (c === ',' && !quoted) return [line.slice(0, i), line.slice(i + 1)];
+        }
+        return [line, ''];
+      })();
+
+      const attrs = {};
+      for (const m of head.matchAll(/([a-zA-Z0-9-]+)="([^"]*)"/g)) attrs[m[1].toLowerCase()] = m[2];
+      const name = title.trim();
+      pending = {
+        name  : name || attrs['tvg-name'] || 'Unnamed',
+        logo  : attrs['tvg-logo'] || '',
+        group : attrs['group-title'] || 'Ungrouped',
+        tvgId : attrs['tvg-id'] || ''
+      };
+    }
+    else if (line.startsWith('#EXTGRP:') && pending){
+      pending.group = line.slice(8).trim() || pending.group;   // legacy grouping
+    }
+    else if (line.startsWith('#')){
+      continue;                                      // #EXTM3U, #EXTVLCOPT, comments
+    }
+    else if (pending){
+      pending.url = line;
+      out.push(pending);
+      pending = null;
+    }
+  }
+  return out;
+}
+
+/* ============================================================
+   XTREAM CODES API
+   ============================================================ */
+async function loadXtream(host, user, pass){
+  host = host.replace(/\/+$/, '');
+  const api = `${host}/player_api.php?username=${encodeURIComponent(user)}&password=${encodeURIComponent(pass)}`;
+
+  const auth = await httpGet(api, true);
+  if (!auth.user_info || auth.user_info.auth !== 1) throw new Error('Login rejected by server.');
+
+  const [cats, streams] = await Promise.all([
+    httpGet(api + '&action=get_live_categories', true),
+    httpGet(api + '&action=get_live_streams', true)
+  ]);
+  const catName = Object.fromEntries(cats.map(c => [String(c.category_id), c.category_name]));
+
+  return streams.map(s => ({
+    name  : s.name,
+    logo  : s.stream_icon || '',
+    group : catName[String(s.category_id)] || 'Ungrouped',
+    tvgId : s.epg_channel_id || '',
+    url   : `${host}/live/${encodeURIComponent(user)}/${encodeURIComponent(pass)}/${s.stream_id}.m3u8`
+  }));
+}
+
+/* ============================================================
+   PLAYBACK  —  pick an engine based on the stream type
+   ============================================================ */
+function stopEngine(){
+  const v = $('video');
+  if (engine){
+    try { engine.destroy(); } catch(e){}
+    engine = null;
+  }
+  v.removeAttribute('src');
+  v.load();
+}
+
+function play(ch){
+  const v = $('video');
+  stopEngine();
+  current = ch;
+  $('stage').classList.add('live');
+  $('npName').textContent  = ch.name;
+  $('npState').textContent = 'connecting…';
+  localStorage.setItem(LS.last, ch.url);
+  render();
+
+  const url  = ch.url;
+  const isTs = /\.(ts|mpegts)(\?|$)/i.test(url);
+  const isFile = /\.(mp4|m4v|webm|mkv|mov|avi|flv|mp3|aac)(\?|$)/i.test(url);
+  // Live IPTV is overwhelmingly HLS, and plenty of URLs carry no extension
+  // at all, so treat anything that isn't clearly TS or a plain file as HLS.
+  const isHls = /\.m3u8(\?|$)/i.test(url) || (!isTs && !isFile);
+  const nativeHls = !!v.canPlayType('application/vnd.apple.mpegurl'); // Safari/iOS
+
+  if (isHls && window.Hls && Hls.isSupported()){
+    engine = new Hls({ lowLatencyMode:true, backBufferLength:30, manifestLoadingMaxRetry:2 });
+    engine.loadSource(url);
+    engine.attachMedia(v);
+    engine.on(Hls.Events.ERROR, (_, d) => {
+      if (!d.fatal) return;
+      // not actually HLS? fall back to letting the browser try directly
+      if (d.details === 'manifestParsingError' || d.details === 'manifestIncompatibleCodecsError'){
+        stopEngine(); v.src = url; v.play().catch(()=>{});
+        return;
+      }
+      $('npState').textContent = 'failed';
+      explainHls(d, url);
+    });
+  }
+  else if (isTs && window.mpegts && mpegts.isSupported()){
+    engine = mpegts.createPlayer({ type:'mpegts', isLive:true, url });
+    engine.attachMediaElement(v);
+    engine.on(mpegts.Events.ERROR, (type, detail) =>
+      toast(`<b>MPEG-TS error:</b> ${esc(type)} — ${esc(detail)}. Raw .ts streams are the
+             shakiest format in a browser; this is a strong candidate for a native player.`));
+    engine.load();
+  }
+  else if (isHls && nativeHls){
+    v.src = url;                                     // Safari / iOS do HLS themselves
+  }
+  else if (isFile){
+    v.src = url;
+  }
+  else {
+    toast(`<b>No engine available.</b> ${libErr.length
+      ? 'These libraries never loaded: ' + libErr.join(', ') + ' — you are offline, or a blocker/firewall is stopping jsdelivr.com.'
+      : 'This browser cannot play that stream type.'}`);
+  }
+
+  v.play().catch(() => { if ($('npState').textContent !== 'failed') $('npState').textContent = 'press play'; });
+}
+
+/* ---------- diagnostics ---------- */
+function toast(html){
+  $('toastMsg').innerHTML = html;
+  $('toast').classList.add('show');
+  console.warn('[iptv]', $('toastMsg').textContent);
+}
+
+// Turn an hls.js failure into something a human can act on.
+function explainHls(d, url){
+  const status  = d.response && d.response.code;
+  const onFile  = location.protocol === 'file:';
+  const crossOrigin = (() => {
+    try { return new URL(url, location.href).origin !== location.origin; } catch { return true; }
+  })();
+
+  if (d.type === 'networkError' && (status === 0 || status === undefined)){
+    toast(`<b>Blocked before it even started.</b> The browser refused the request rather than
+      the server rejecting it, which means CORS${onFile ? ' — and you opened this page as a <i>file://</i> document, so your origin is literally "null" and almost every CDN rejects that' : ''}.
+      ${onFile ? 'Serve the folder over http instead: <i>python -m http.server 8000</i> then open <i>http://localhost:8000</i>.'
+               : 'That server does not send Access-Control-Allow-Origin. A browser cannot bypass it — this one needs the native wrapper.'}`);
+  }
+  else if (status === 403 || status === 401){
+    toast(`<b>HTTP ${status} — rejected.</b> The stream exists but refused you. Usually a required
+      User-Agent or Referer header, or an expired/exhausted subscription token. Browsers cannot
+      set those headers; a native wrapper can.`);
+  }
+  else if (status === 404 || status === 410){
+    toast(`<b>HTTP ${status} — gone.</b> This channel is simply dead. Normal for public lists;
+      try the Apple BipBop test stream to prove the player itself works.`);
+  }
+  else if (d.type === 'mediaError'){
+    toast(`<b>Decode error (${esc(d.details)}).</b> The stream arrived but this browser cannot
+      decode it — typically H.265/HEVC or AC-3 audio, neither of which Chrome handles.
+      Playing that needs a native player such as libmpv or ExoPlayer.`);
+  }
+  else {
+    toast(`<b>Stream error:</b> ${esc(d.details)} ${status ? '(HTTP ' + status + ')' : ''}. ${crossOrigin ? 'Cross-origin stream, so CORS is the likeliest cause.' : ''}`);
+  }
+}
+
+$('video').addEventListener('playing', () => $('npState').textContent = '● live');
+$('video').addEventListener('waiting', () => $('npState').textContent = 'buffering…');
+$('video').addEventListener('error', () => {
+  // stopEngine() detaches the source, which itself fires a bogus error event.
+  // A genuine failure always has a resolved currentSrc; a teardown never does.
+  if (!$('video').currentSrc) return;
+  const e = $('video').error || {};
+  const why = {
+    1:'playback was aborted',
+    2:'network error — connection dropped or was blocked',
+    3:'decode error — the browser lacks this codec (often H.265 or AC-3)',
+    4:'source not supported — wrong format, or CORS blocked it outright'
+  }[e.code] || 'unknown failure';
+  $('npState').textContent = 'failed';
+  toast(`<b>Video element error:</b> ${why}.`);
+});
+
+/* ============================================================
+   RENDER
+   ============================================================ */
+function visible(){
+  return channels.filter(c =>
+    (group === 'All' || (group === '★ Favorites' ? favs.has(c.url) : c.group === group)) &&
+    (!favOnly || favs.has(c.url)) &&
+    (!query   || c.name.toLowerCase().includes(query))
+  );
+}
+
+function render(){
+  // --- sidebar ---
+  const counts = {};
+  for (const c of channels) counts[c.group] = (counts[c.group] || 0) + 1;
+  const names = ['All', ...(favs.size ? ['★ Favorites'] : []), ...Object.keys(counts).sort()];
+
+  $('groups').innerHTML = names.map(g => {
+    const n = g === 'All' ? channels.length : g === '★ Favorites' ? favs.size : counts[g];
+    return `<div class="grp ${g === group ? 'on' : ''}" data-g="${esc(g)}">
+              <span>${esc(g)}</span><b>${n}</b></div>`;
+  }).join('');
+
+  // --- channel list ---
+  const rows = visible();
+  if (!rows.length){
+    $('list').innerHTML = `<div class="empty">${channels.length ? 'Nothing matches that filter.' : 'No playlist loaded yet.<br>Hit <b>Source</b> to begin.'}</div>`;
+    return;
+  }
+  // cap the DOM for huge playlists (some lists are 20k+ channels)
+  const slice = rows.slice(0, 400);
+  $('list').innerHTML = slice.map((c, i) => `
+    <div class="ch ${current && current.url === c.url ? 'on' : ''}" data-i="${i}">
+      <span class="ic"><b>${esc((c.name.match(/[a-z0-9]/i) || ['?'])[0]).toUpperCase()}</b>${
+        c.logo ? `<img src="${esc(c.logo)}" loading="lazy"
+                   onload="this.previousElementSibling.style.display='none'"
+                   onerror="this.remove()">` : ''}</span>
+      <span class="nm">${esc(c.name)}</span>
+      <span class="fav ${favs.has(c.url) ? 'on' : ''}" data-fav="${i}">&#9733;</span>
+    </div>`).join('')
+    + (rows.length > slice.length
+        ? `<div class="empty">+ ${rows.length - slice.length} more — use search to narrow down</div>` : '');
+
+  $('list')._rows = slice;
+}
+
+/* ============================================================
+   EVENTS
+   ============================================================ */
+$('groups').onclick = e => {
+  const el = e.target.closest('.grp');
+  if (!el) return;
+  group = el.dataset.g;
+  $('groups').classList.remove('open');
+  render();
+};
+
+$('list').onclick = e => {
+  const rows = $('list')._rows || [];
+  const f = e.target.closest('[data-fav]');
+  if (f){
+    const ch = rows[+f.dataset.fav];
+    favs.has(ch.url) ? favs.delete(ch.url) : favs.add(ch.url);
+    localStorage.setItem(LS.fav, JSON.stringify([...favs]));
+    render();
+    return;
+  }
+  const row = e.target.closest('.ch');
+  if (row) play(rows[+row.dataset.i]);
+};
+
+$('q').oninput = e => { query = e.target.value.toLowerCase().trim(); render(); };
+$('favBtn').onclick = e => { favOnly = !favOnly; e.target.style.color = favOnly ? 'var(--accent)' : ''; render(); };
+$('burger').onclick = () => $('groups').classList.toggle('open');
+$('srcBtn').onclick = () => $('veil').classList.add('show');
+$('closeVeil').onclick = () => $('veil').classList.remove('show');
+
+document.querySelectorAll('.tabs button').forEach(b => b.onclick = () => {
+  document.querySelectorAll('.tabs button').forEach(x => x.classList.toggle('on', x === b));
+  document.querySelectorAll('.pane').forEach(p => p.classList.toggle('on', p.id === 'pane-' + b.dataset.pane));
+  say('');
+});
+
+function say(text, cls = ''){ const m = $('msg'); m.textContent = text; m.className = 'msg ' + cls; }
+
+function adopt(list, source){
+  if (!list.length) throw new Error('Parsed 0 channels — is that really a playlist?');
+  channels = list;
+  group = 'All';
+  if (source) localStorage.setItem(LS.src, JSON.stringify(source));
+  $('veil').classList.remove('show');
+  render();
+}
+
+/* ============================================================
+   MIX BUILDER
+   Pulls per-country playlists from the iptv-org directory and keeps
+   only the entries whose group-title matches the chosen categories.
+   ============================================================ */
+const COUNTRY_SRC = cc => `https://iptv-org.github.io/iptv/countries/${cc}.m3u`;
+
+// group-title values in the source lists don't line up 1:1 with what a
+// user means by "movies" or "sports", so map each category to keywords.
+const CAT_WORDS = {
+  sports      : ['sport', 'football', 'soccer', 'motor', 'fight', 'racing', 'outdoor'],
+  music       : ['music', 'classic music'],
+  movies      : ['movies', 'series', 'western', 'comedy', 'animation'],
+  news        : ['news', 'business', 'weather'],
+  kids        : ['kids', 'family', 'animation'],
+  documentary : ['documentary', 'education', 'science', 'travel', 'culture', 'history']
+};
+
+const picked = sel => [...document.querySelectorAll(`#${sel} input:checked`)].map(i => i.value);
+
+async function buildMix(){
+  const ccs  = picked('mixCountries');
+  const cats = picked('mixCats');
+  if (!ccs.length)  throw new Error('Pick at least one country.');
+  if (!cats.length) throw new Error('Pick at least one category.');
+
+  const words = cats.flatMap(c => CAT_WORDS[c] || [c]);
+  const clean = $('mixClean').checked;
+  const seen  = new Set();
+  const out   = [];
+
+  for (const cc of ccs){
+    say(`Fetching ${cc.toUpperCase()}…`);
+    let text;
+    try { text = await httpGet(COUNTRY_SRC(cc)); }
+    catch { continue; }                                     // skip a country that 404s
+
+    for (const ch of parseM3U(text)){
+      const groups = ch.group.toLowerCase().split(';').map(s => s.trim());
+      if (!groups.some(g => words.some(w => g.includes(w)))) continue;
+      if (clean && /\[(geo-blocked|not 24\/7)\]/i.test(ch.name)) continue;
+      if (seen.has(ch.url)) continue;
+      seen.add(ch.url);
+
+      // retag so the sidebar groups by category, and note the country
+      const hit = cats.find(c => (CAT_WORDS[c] || [c]).some(w => groups.some(g => g.includes(w))));
+      out.push({ ...ch,
+        group : hit ? hit[0].toUpperCase() + hit.slice(1) : ch.group,
+        name  : `${ch.name.replace(/\s*\((\d+p|SD)\)\s*/i, ' ').trim()}  ·  ${cc.toUpperCase()}`
+      });
+    }
+  }
+  out.sort((a, b) => a.group.localeCompare(b.group) || a.name.localeCompare(b.name));
+  return out;
+}
+
+function toM3U(list){
+  return '#EXTM3U\n' + list.map(c =>
+    `#EXTINF:-1 tvg-id="${c.tvgId}" tvg-logo="${c.logo}" group-title="${c.group}",${c.name}\n${c.url}`
+  ).join('\n') + '\n';
+}
+
+$('buildMix').onclick = async () => {
+  try {
+    const list = await buildMix();
+    say(`Found ${list.length} channels.`, 'ok');
+    $('saveMix').style.display = 'block';
+    adopt(list, null);
+    $('veil').classList.add('show');                        // keep open so Save is reachable
+  } catch (err){ say(err.message, 'err'); }
+};
+
+$('saveMix').onclick = () => {
+  const blob = new Blob([toM3U(channels)], { type:'audio/x-mpegurl' });
+  const a = Object.assign(document.createElement('a'), {
+    href: URL.createObjectURL(blob), download: 'my-mix.m3u'
+  });
+  a.click(); URL.revokeObjectURL(a.href);
+};
+
+$('loadBundled').onclick = async () => {
+  try {
+    // same-origin asset inside the APK — ordinary fetch, no native HTTP needed
+    const r = await fetch('example.m3u');
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    adopt(parseM3U(await r.text()), null);
+    say('Loaded the bundled test list.', 'ok');
+  } catch (err){ say('Could not read bundled playlist: ' + err.message, 'err'); }
+};
+
+$('loadM3u').onclick = async () => {
+  const url = $('m3uUrl').value.trim();
+  if (!url) return say('Paste a URL first.', 'err');
+  say('Fetching…');
+  try {
+    adopt(parseM3U(await httpGet(url)), { kind:'m3u', url });
+  } catch (err){
+    say(err.message + (native() ? '' : ' — if this is a CORS block it will work in the Android build.'), 'err');
+  }
+};
+
+$('m3uFile').onchange = async e => {
+  const f = e.target.files[0];
+  if (!f) return;
+  try { adopt(parseM3U(await f.text()), null); }
+  catch (err){ say(err.message, 'err'); }
+};
+
+$('loadXc').onclick = async () => {
+  const host = $('xcHost').value.trim(), user = $('xcUser').value.trim(), pass = $('xcPass').value;
+  if (!host || !user) return say('Server and username are required.', 'err');
+  say('Connecting…');
+  try {
+    adopt(await loadXtream(host, user, pass), { kind:'xc', host, user, pass });
+  } catch (err){
+    say(err.message + (native() ? '' : ' (CORS can also cause this in a plain browser.)'), 'err');
+  }
+};
+
+/* ============================================================
+   ANDROID GLUE
+   Back button, orientation-driven fullscreen, and keeping the screen
+   awake while a stream is playing.
+   ============================================================ */
+function initNative(){
+  if (!window.Capacitor || !Capacitor.Plugins) return;
+  const P = Capacitor.Plugins;
+
+  // Android hardware/gesture back: close dialog, then stop playback,
+  // and only exit the app from the channel list. Without this the back
+  // gesture kills the whole app mid-stream, which feels awful.
+  if (P.App){
+    P.App.addListener('backButton', () => {
+      if ($('veil').classList.contains('show')) { $('veil').classList.remove('show'); return; }
+      if ($('toast').classList.contains('show')) { $('toast').classList.remove('show'); return; }
+      if (document.body.classList.contains('cinema')) { exitCinema(); return; }
+      if ($('stage').classList.contains('live')) { stopEngine(); $('stage').classList.remove('live'); current = null; render(); return; }
+      if ($('groups').classList.contains('open')) { $('groups').classList.remove('open'); return; }
+      P.App.exitApp();
+    });
+
+    // Release the decoder when backgrounded, or Android may kill us for
+    // holding hardware codecs, and audio would keep playing over other apps.
+    P.App.addListener('appStateChange', ({ isActive }) => {
+      if (!isActive && current) $('video').pause();
+    });
+  }
+
+  // Rotating to landscape goes fullscreen; rotating back returns.
+  const onOrient = () => {
+    const landscape = window.innerWidth > window.innerHeight;
+    if (landscape && current) enterCinema(); else exitCinema();
+  };
+  window.addEventListener('orientationchange', () => setTimeout(onOrient, 250));
+}
+
+function enterCinema(){
+  document.body.classList.add('cinema');
+  const P = window.Capacitor && Capacitor.Plugins;
+  if (P && P.StatusBar) P.StatusBar.hide().catch(()=>{});
+}
+function exitCinema(){
+  document.body.classList.remove('cinema');
+  const P = window.Capacitor && Capacitor.Plugins;
+  if (P && P.StatusBar) P.StatusBar.show().catch(()=>{});
+}
+
+// Double-tap the video to toggle fullscreen by hand.
+let lastTap = 0;
+$('video').addEventListener('click', () => {
+  const now = Date.now();
+  if (now - lastTap < 300)
+    document.body.classList.contains('cinema') ? exitCinema() : enterCinema();
+  lastTap = now;
+});
+
+// Keep the screen on while something is playing.
+$('video').addEventListener('playing', async () => {
+  const P = window.Capacitor && Capacitor.Plugins;
+  if (P && P.KeepAwake) P.KeepAwake.keepAwake().catch(()=>{});
+});
+$('video').addEventListener('pause', async () => {
+  const P = window.Capacitor && Capacitor.Plugins;
+  if (P && P.KeepAwake) P.KeepAwake.allowSleep().catch(()=>{});
+});
+
+/* ============================================================
+   INSTALLABLE WEB APP
+   Only relevant when served from a real https origin; inside the
+   Capacitor APK all of this is skipped, since it is already an app.
+   ============================================================ */
+function initPWA(){
+  if (native()) return;
+
+  // The service worker is what makes the app launchable offline. It only
+  // ever touches the app's own shell files — never stream requests, which
+  // must not be cached and must not be intercepted (that would break
+  // hls.js range requests).
+  if ('serviceWorker' in navigator && location.protocol === 'https:'){
+    navigator.serviceWorker.register('sw.js').catch(e => console.warn('SW failed', e));
+  }
+
+  // Chrome fires this when the app qualifies for installation. Capture it
+  // so we can offer a real button instead of relying on the user finding
+  // "Add to home screen" buried in the browser menu.
+  let prompt = null;
+  window.addEventListener('beforeinstallprompt', e => {
+    e.preventDefault();
+    prompt = e;
+    $('installBtn').style.display = 'block';
+  });
+  $('installBtn').onclick = async () => {
+    if (!prompt) return;
+    prompt.prompt();
+    const { outcome } = await prompt.userChoice;
+    if (outcome === 'accepted') $('installBtn').style.display = 'none';
+    prompt = null;
+  };
+  window.addEventListener('appinstalled', () => $('installBtn').style.display = 'none');
+}
+
+/* ============================================================
+   BOOT — restore the last source
+   ============================================================ */
+(async function boot(){
+  initNative();
+  initPWA();
+  if (matchMedia('(max-width:640px)').matches) $('burger').style.display = 'block';
+
+  // Fail loudly at startup rather than mysteriously on first click.
+  if (libErr.length){
+    toast(`<b>Playback libraries did not load:</b> ${libErr.join(', ')}.
+      You are offline, or an adblocker/firewall is blocking cdn.jsdelivr.net.
+      Nothing will play until this is fixed.`);
+  } else if (!native() && location.protocol === 'file:'){
+    toast(`<b>Heads up:</b> opened as a <i>file://</i> page, so your origin is "null" and many
+      servers will refuse the stream. If a channel fails, run
+      <i>python -m http.server 8000</i> in this folder and use <i>http://localhost:8000</i> instead.`);
+  }
+  const saved = JSON.parse(localStorage.getItem(LS.src) || 'null');
+  if (!saved) return;
+  try {
+    if (saved.kind === 'm3u'){
+      adopt(parseM3U(await httpGet(saved.url)), null);
+    } else if (saved.kind === 'xc'){
+      $('xcHost').value = saved.host; $('xcUser').value = saved.user; $('xcPass').value = saved.pass;
+      adopt(await loadXtream(saved.host, saved.user, saved.pass), null);
+    }
+  } catch(e){ /* offline or CORS — user can reload manually */ }
+})();
+</script>
+</body>
+</html>

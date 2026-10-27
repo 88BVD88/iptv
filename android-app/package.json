@@ -1,0 +1,20 @@
+{
+  "name": "my-iptv",
+  "version": "1.0.0",
+  "private": true,
+  "description": "IPTV player — Capacitor shell around the HTML/JS app in www/",
+  "scripts": {
+    "vendor": "node tools/vendor.mjs",
+    "patch": "node tools/patch-android.mjs",
+    "sync": "npm run vendor && npm run patch && npx cap sync android",
+    "open": "npm run sync && npx cap open android",
+    "apk": "npm run sync && cd android && gradlew.bat assembleDebug",
+    "apk:linux": "npm run sync && cd android && ./gradlew assembleDebug",
+    "bundle": "npm run sync && cd android && gradlew.bat bundleRelease",
+    "bundle:linux": "npm run sync && cd android && ./gradlew bundleRelease"
+  },
+  "dependencies": {
+    "hls.js": "^1.5.17",
+    "mpegts.js": "^1.7.3"
+  }
+}

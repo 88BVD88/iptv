@@ -1,0 +1,82 @@
+#EXTM3U x-tvg-url="https://iptv-org.github.io/epg/guides/ro.xml"
+# ^ THE HEADER. Must be the very first line, exactly "#EXTM3U".
+#   x-tvg-url is optional: it tells a player where to find the XMLTV
+#   programme guide for these channels. Multiple guides = comma separated.
+#
+# ----------------------------------------------------------------------
+# ANATOMY OF ONE CHANNEL  —  it is ALWAYS exactly two lines.
+#
+#   Line 1:  #EXTINF:<duration> <attributes>,<Display Name>
+#   Line 2:  the stream URL, bare, nothing else on the line
+#
+#   duration   = -1 for live TV (it never ends). A number of seconds for VOD.
+#   attributes = space separated key="value" pairs. All optional.
+#
+#   THE COMMA TRAP — the single thing most parsers get wrong.
+#   The name is everything after the first comma that is NOT inside quotes.
+#     - Split on the first comma blindly and  group-title="Sports, Live"
+#       cuts the line in half.
+#     - Split on the LAST comma instead and a channel genuinely called
+#       "Sport, Live HD" gets truncated to "Live HD".
+#   So you must walk the line character by character, flipping an
+#   "inside quotes" flag on every " and splitting at the first comma
+#   found while outside quotes. That is what the app's parser does.
+#
+#   Useful attributes:
+#     tvg-id      matches this channel to the EPG guide. Must match exactly.
+#     tvg-name    name as written in the EPG, if different from display name
+#     tvg-logo    URL to a logo image, ideally transparent PNG
+#     group-title the folder/category your app shows in its sidebar
+#     tvg-shift   hours to shift the EPG, e.g. "-1" for a timezone offset
+# ----------------------------------------------------------------------
+
+# --- Romania -----------------------------------------------------------
+#EXTINF:-1 tvg-id="AlephNews.ro" tvg-logo="https://i.imgur.com/qPRQZMI.png" group-title="News",Aleph News
+https://stream-aleph.m.ro/Aleph/ngrp:Alephnewsmain.stream_all/playlist.m3u8
+
+#EXTINF:-1 tvg-id="A7TV.ro" tvg-logo="https://i.imgur.com/RmFg8BN.png" group-title="General",A7TV
+https://a7tvlive.ro/A7TV/A7TV/playlist.m3u8
+
+#EXTINF:-1 tvg-id="AgroTV.ro" tvg-logo="https://i.imgur.com/S7X1PiC.png" group-title="Outdoor",Agro TV
+https://agrotv.streamnet.ro/mobile_tv/agrotv.m3u8
+
+# --- Spain -------------------------------------------------------------
+#EXTINF:-1 tvg-id="3CatInfo.es" group-title="News",3Cat Info
+https://directes-tv-int.3catdirectes.cat/live-origin/canal324-hls/master.m3u8
+
+#EXTINF:-1 tvg-id="3CatPlatsbruts.es" group-title="Movies",3Cat Plats Bruts
+https://fast-tailor.3catdirectes.cat/v1/channel/ccma-channel2/hls.m3u8
+
+#EXTINF:-1 tvg-id="7TV.es" tvg-logo="https://i.imgur.com/rnzMR9R.png" group-title="General",7TV Andalucia
+https://especial7tv.gestec-video.com/hls/regional.m3u8
+
+# --- Test streams: always up, perfect for debugging your player --------
+#EXTINF:-1 group-title="Test",Apple BipBop (adaptive HLS)
+https://devstreaming-cdn.apple.com/videos/streaming/examples/img_bipbop_adv_example_fmp4/master.m3u8
+
+#EXTINF:-1 group-title="Test",Mux Test Stream
+https://stream.mux.com/v69RSHhFelSm4701snP22dYz2jICy4E4FUyk02rW4gxRM.m3u8
+
+# ----------------------------------------------------------------------
+# PER-CHANNEL OPTIONS (#EXTVLCOPT)
+# Some servers reject you unless you send the right headers. These lines
+# go BETWEEN the #EXTINF and the URL. VLC and most IPTV apps honour them;
+# a browser cannot set them, which is one reason native wrappers matter.
+#
+#   #EXTINF:-1 group-title="Example",Picky Server
+#   #EXTVLCOPT:http-user-agent=Mozilla/5.0
+#   #EXTVLCOPT:http-referrer=https://example.com/
+#   http://example.com/stream.m3u8
+#
+# GROUPING, THE OLD WAY
+# Before group-title existed, players used a separate directive. You may
+# still meet it in the wild, so a good parser handles both. The app
+# supports this too:
+#
+#   #EXTGRP:Sports
+#
+# COMMENTS
+# Any line starting with # that is not a known directive is ignored, which
+# is how this whole tutorial sits inside a valid playlist file. Try loading
+# this very file in your app via the File tab — it will work.
+# ----------------------------------------------------------------------
